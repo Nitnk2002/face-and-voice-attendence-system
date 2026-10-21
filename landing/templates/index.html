@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apni Kaksha — AI-Powered Attendance Platform</title>
+  <meta name="description" content="Apni Kaksha makes attendance effortless using Face Recognition and Voice Recognition AI. The smartest classroom attendance system built for modern education." />
+  <meta property="og:title" content="Apni Kaksha — AI Attendance Platform" />
+  <meta property="og:description" content="Mark attendance in seconds using Face & Voice AI. Built for teachers, loved by students." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+</head>
+<body>
+
+  <!-- ── NAVBAR ─────────────────────────────────────────── -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo" id="nav-logo">
+        <span class="logo-icon">🎓</span>
+        <span class="logo-text">Apni <span class="accent">Kaksha</span></span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#features" class="nav-link">Features</a></li>
+        <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+        <li><a href="#tech" class="nav-link">Technology</a></li>
+        <li><a href="#contact" class="nav-link">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="http://localhost:8501" class="btn btn-ghost" id="btn-login">Login</a>
+        <a href="http://localhost:8501" class="btn btn-primary" id="btn-get-started">Get Started</a>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── HERO ───────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <div class="hero-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="grid-overlay"></div>
+    </div>
+    <div class="hero-container">
+      <div class="hero-badge" id="hero-badge">
+        <span class="badge-dot"></span>
+        AI-Powered • Real-Time • Secure
+      </div>
+      <h1 class="hero-title" id="hero-title">
+        Attendance that<br />
+        <span class="gradient-text">knows your face</span><br />
+        and your voice
+      </h1>
+      <p class="hero-subtitle" id="hero-subtitle">
+        Apni Kaksha replaces roll calls with cutting-edge Face &amp; Voice Recognition AI.
+        Teachers save time. Students stay engaged. Every session, perfectly tracked.
+      </p>
+      <div class="hero-actions" id="hero-actions">
+        <a href="http://localhost:8501" class="btn btn-primary btn-xl" id="cta-teacher">
+          <span>Start as Teacher</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="http://localhost:8501" class="btn btn-outline btn-xl" id="cta-student">
+          Join as Student
+        </a>
+      </div>
+      <div class="hero-stats" id="hero-stats">
+        <div class="stat">
+          <span class="stat-value">2s</span>
+          <span class="stat-label">Avg. check-in time</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value">99.2%</span>
+          <span class="stat-label">Recognition accuracy</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value">0</span>
+          <span class="stat-label">Manual roll calls</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero visual mockup -->
+    <div class="hero-visual" id="hero-visual">
+      <div class="mockup-card glass">
+        <div class="mockup-header">
+          <div class="mockup-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <span class="mockup-title">Live Attendance — CS101</span>
+        </div>
+        <div class="mockup-scan-area">
+          <div class="scan-ring"></div>
+          <div class="scan-face">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="1.5">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </div>
+          <div class="scan-label">Scanning face...</div>
+        </div>
+        <div class="mockup-students">
+          <div class="student-row present" id="s1">
+            <span class="avatar">AK</span>
+            <span class="s-name">Arjun Kumar</span>
+            <span class="badge-present">Present ✓</span>
+          </div>
+          <div class="student-row present" id="s2">
+            <span class="avatar">PS</span>
+            <span class="s-name">Priya Sharma</span>
+            <span class="badge-present">Present ✓</span>
+          </div>
+          <div class="student-row scanning" id="s3">
+            <span class="avatar">RS</span>
+            <span class="s-name">Rahul Singh</span>
+            <span class="badge-scanning">Scanning...</span>
+          </div>
+          <div class="student-row absent" id="s4">
+            <span class="avatar">MD</span>
+            <span class="s-name">Meera Devi</span>
+            <span class="badge-absent">Absent</span>
+          </div>
+        </div>
+        <div class="mockup-footer">
+          <span class="footer-count">2/4 marked</span>
+          <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ───────────────────────────────────────── -->
+  <section class="features" id="features">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">Features</span>
+        <h2 class="section-title">Everything your classroom needs</h2>
+        <p class="section-sub">Designed for teachers who value time, and students who value fairness.</p>
+      </div>
+      <div class="features-grid">
+
+        <div class="feature-card" id="feat-face">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">Face Recognition</h3>
+          <p class="feat-desc">Industry-grade dlib face encoding identifies each student instantly — no tokens, no cards, no friction.</p>
+          <div class="feat-tag">dlib · face_recognition</div>
+        </div>
+
+        <div class="feature-card" id="feat-voice">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">Voice Recognition</h3>
+          <p class="feat-desc">A unique voiceprint per student powered by resemblyzer. A second layer of verification for airtight accuracy.</p>
+          <div class="feat-tag">resemblyzer · librosa</div>
+        </div>
+
+        <div class="feature-card" id="feat-qr">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              <path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">QR Code Enrollment</h3>
+          <p class="feat-desc">Teachers generate a class QR code via segno. Students scan once to enroll — face + voice captured automatically.</p>
+          <div class="feat-tag">segno · QR</div>
+        </div>
+
+        <div class="feature-card" id="feat-analytics">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M18 20V10M12 20V4M6 20v-6"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">Live Analytics</h3>
+          <p class="feat-desc">Real-time attendance dashboards with per-student history, class-level trends, and exportable reports.</p>
+          <div class="feat-tag">Streamlit · Charts</div>
+        </div>
+
+        <div class="feature-card" id="feat-secure">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">Secure by Design</h3>
+          <p class="feat-desc">bcrypt-hashed passwords, Supabase RLS-enforced data isolation, and zero hardcoded secrets — ever.</p>
+          <div class="feat-tag">bcrypt · Supabase RLS</div>
+        </div>
+
+        <div class="feature-card" id="feat-realtime">
+          <div class="feat-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <h3 class="feat-title">Real-Time Updates</h3>
+          <p class="feat-desc">Attendance marks reflect instantly. No refresh needed. Teachers see the room fill up in real time.</p>
+          <div class="feat-tag">Supabase Realtime</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ───────────────────────────────────── -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">How It Works</span>
+        <h2 class="section-title">Three steps to a smarter classroom</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step" id="step-1">
+          <div class="step-number">01</div>
+          <div class="step-content">
+            <h3>Teacher creates a class</h3>
+            <p>Register, create your class, and share the unique QR code or join-link with your students. Done in under a minute.</p>
+          </div>
+          <div class="step-arrow">→</div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-number">02</div>
+          <div class="step-content">
+            <h3>Students enroll once</h3>
+            <p>Scan the QR, capture your face and voice sample. The AI encodes your biometric profile securely in Supabase.</p>
+          </div>
+          <div class="step-arrow">→</div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-number">03</div>
+          <div class="step-content">
+            <h3>Attendance marks itself</h3>
+            <p>Each session, the AI scans faces and voices. Matched students are marked present — instantly, automatically, accurately.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TECH STACK ─────────────────────────────────────── -->
+  <section class="tech-stack" id="tech">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-tag">Technology</span>
+        <h2 class="section-title">Built on a proven, modern stack</h2>
+        <p class="section-sub">No experiments. Every library chosen for production reliability.</p>
+      </div>
+      <div class="tech-grid">
+        <div class="tech-chip" id="tc-streamlit"><span class="tech-emoji">⚡</span> Streamlit</div>
+        <div class="tech-chip" id="tc-flask"><span class="tech-emoji">🌐</span> Flask</div>
+        <div class="tech-chip" id="tc-supabase"><span class="tech-emoji">🗄️</span> Supabase</div>
+        <div class="tech-chip" id="tc-dlib"><span class="tech-emoji">👤</span> dlib</div>
+        <div class="tech-chip" id="tc-resemblyzer"><span class="tech-emoji">🎙️</span> resemblyzer</div>
+        <div class="tech-chip" id="tc-librosa"><span class="tech-emoji">🎵</span> librosa</div>
+        <div class="tech-chip" id="tc-bcrypt"><span class="tech-emoji">🔐</span> bcrypt</div>
+        <div class="tech-chip" id="tc-segno"><span class="tech-emoji">📱</span> segno</div>
+        <div class="tech-chip" id="tc-sklearn"><span class="tech-emoji">🤖</span> scikit-learn</div>
+        <div class="tech-chip" id="tc-vercel"><span class="tech-emoji">▲</span> Vercel</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA BANNER ─────────────────────────────────────── -->
+  <section class="cta-banner" id="contact">
+    <div class="cta-orb"></div>
+    <div class="section-container">
+      <h2 class="cta-title">Ready to modernize your classroom?</h2>
+      <p class="cta-sub">Join Apni Kaksha — no hardware, no badges, no hassle. Just AI.</p>
+      <div class="cta-actions">
+        <a href="http://localhost:8501" class="btn btn-primary btn-xl" id="cta-main">
+          Launch the App
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ─────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="logo-icon">🎓</span>
+        <span class="logo-text">Apni <span class="accent">Kaksha</span></span>
+        <p>Making attendance smarter with AI.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#tech">Tech Stack</a>
+        <a href="http://localhost:8501">Launch App</a>
+      </div>
+      <div class="footer-copy">
+        © 2025 Apni Kaksha. Built with ❤️ for modern education.
+      </div>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
