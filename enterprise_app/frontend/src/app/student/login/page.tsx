@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Users, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
-import { getApiUrl } from "@/lib/api";
+import { getApiUrl, formatFetchError } from "@/lib/api";
 import { AppLogo } from "@/components/ui/AppLogo";
 
 export default function StudentLoginPage() {
@@ -43,7 +43,7 @@ export default function StudentLoginPage() {
 
       router.push("/student/dashboard");
     } catch (err: any) {
-      setError(err.message || "Authentication failed");
+      setError(formatFetchError(err, "/api/v1/auth/login"));
     } finally {
       setLoading(false);
     }

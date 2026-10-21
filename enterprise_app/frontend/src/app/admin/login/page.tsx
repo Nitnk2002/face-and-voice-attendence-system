@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ShieldAlert, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
-import { getApiUrl } from "@/lib/api";
+import { getApiUrl, formatFetchError } from "@/lib/api";
 import { AppLogo } from "@/components/ui/AppLogo";
 
 function decodeJwtPayload(token: string): Record<string, any> | null {
@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
       localStorage.setItem("user_name", "System Administrator");
       router.push("/admin/dashboard");
     } catch (err: any) {
-      setError(err.message || "Authentication failed");
+      setError(formatFetchError(err, "/api/v1/auth/login"));
     } finally {
       setLoading(false);
     }

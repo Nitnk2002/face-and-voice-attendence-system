@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail, User, ArrowRight, AlertCircle } from "lucide-react";
-import { getApiUrl } from "@/lib/api";
+import { Eye, EyeOff, Lock, Mail, User, ArrowRight, AlertCircle, RefreshCw, ExternalLink, CheckCircle2 } from "lucide-react";
+import { getApiUrl, formatFetchError, checkBackendHealth, BackendHealthStatus } from "@/lib/api";
 import { AppLogo } from "@/components/ui/AppLogo";
 
 export default function LoginPage() {
@@ -16,11 +16,31 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<BackendHealthStatus | null>(null);
+  const [probingHealth, setProbingHealth] = useState(false);
+
+  // Probe backend health to alert user early if Render is sleeping or offline
+  const runHealthCheck = async () => {
+    setProbingHealth(true);
+    try {
+      const res = await checkBackendHealth();
+      setHealthStatus(res);
+    } finally {
+      setProbingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    runHealthCheck();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    const loginEndpoint = "/api/v1/auth/login";
+    const signupEndpoint = "/api/v1/auth/signup";
 
     try {
       if (isLogin) {
@@ -29,7 +49,7 @@ export default function LoginPage() {
         params.append("username", email);
         params.append("password", password);
 
-        const res = await fetch(getApiUrl("/api/v1/auth/login"), {
+        const res = await fetch(getApiUrl(loginEndpoint), {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -58,7 +78,7 @@ export default function LoginPage() {
         }
       } else {
         // Teacher / Faculty Sign-up
-        const res = await fetch(getApiUrl("/api/v1/auth/signup"), {
+        const res = await fetch(getApiUrl(signupEndpoint), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -81,7 +101,9 @@ export default function LoginPage() {
         alert("Account created successfully. Please sign in with your credentials.");
       }
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+      setError(formatFetchError(err, isLogin ? loginEndpoint : signupEndpoint));
+      // Re-probe health if fetch fails
+      runHealthCheck();
     } finally {
       setLoading(false);
     }
@@ -132,21 +154,93 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-xl font-extrabold text-[#172B4D] tracking-tight">
-            {isLogin ? "Welcome back" : "Register faculty account"}
-          </h1>
-          <p className="text-xs text-[#667085] mt-1">
-            {isLogin
-              ? "Access your assigned courses and live attendance kiosk."
-              : "Set up a new instructor profile to begin managing sessions."}
-          </p>
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-extrabold text-[#172B4D] tracking-tight">
+              {isLogin ? "Welcome back" : "Register faculty account"}
+            </h1>
+            <p className="text-xs text-[#667085] mt-1">
+              {isLogin
+                ? "Access your assigned courses and live attendance kiosk."
+                : "Set up a new instructor profile to begin managing sessions."}
+            </p>
+          </div>
+          {healthStatus?.online ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#E8F5E9] text-[#2E7D32] shrink-0 border border-[#C8E6C9]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D32]" />
+              Online
+            </span>
+          ) : probingHealth ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F4F6F4] text-[#667085] shrink-0">
+              <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+              Probing
+            </span>
+          ) : null}
         </div>
 
+        {healthStatus && !healthStatus.online && (
+          <div className="mb-5 p-3 rounded-xl bg-[#FFF9E6] border border-[#FFE7A3] text-xs text-[#8F6B00] flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#B28400]" />
+                <div>
+                  <span className="font-bold">Backend connecting or sleeping</span>
+                  <p className="text-[11px] text-[#7A5B00] mt-0.5">
+                    Render free instances sleep after 15 min and take ~45s to wake up on first visit.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={runHealthCheck}
+                disabled={probingHealth}
+                className="shrink-0 p-1 rounded-md hover:bg-[#FFF2BF] text-[#7A5B00] transition-colors"
+                title="Retry probe"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${probingHealth ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between text-[11px] border-t border-[#FFE7A3]/60 pt-1.5">
+              <span className="truncate max-w-[200px] text-[#9E7700] font-mono">{healthStatus.url}</span>
+              <a
+                href={healthStatus.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-[#176B5B] hover:underline"
+              >
+                Wake up / Test <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
+
         {error && (
-          <div className="mb-5 p-3 rounded-xl bg-[#FDF4F4] border border-[#FAD2CF] text-xs text-[#C2413B] flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="mb-5 p-3.5 rounded-xl bg-[#FDF4F4] border border-[#FAD2CF] text-xs text-[#C2413B] flex flex-col gap-2">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
+            </div>
+            {error.includes("Cannot connect to backend") && (
+              <div className="flex items-center gap-3 pt-2 border-t border-[#FAD2CF]/60 text-[11px]">
+                <button
+                  type="button"
+                  onClick={runHealthCheck}
+                  disabled={probingHealth}
+                  className="font-bold underline text-[#C2413B] hover:opacity-80 flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${probingHealth ? "animate-spin" : ""}`} /> Retry Connection
+                </button>
+                <span>·</span>
+                <a
+                  href={getApiUrl("/health")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold underline text-[#176B5B] hover:opacity-80 inline-flex items-center gap-0.5"
+                >
+                  Open Backend in New Tab <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            )}
           </div>
         )}
 
