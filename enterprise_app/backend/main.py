@@ -59,10 +59,16 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # Log the exception here
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin:
+        headers["access-control-allow-origin"] = origin
+        headers["access-control-allow-credentials"] = "true"
+        headers["vary"] = "Origin"
     return JSONResponse(
         status_code=500,
         content={"message": "An internal server error occurred.", "details": str(exc)},
+        headers=headers,
     )
 
 @app.get("/")
