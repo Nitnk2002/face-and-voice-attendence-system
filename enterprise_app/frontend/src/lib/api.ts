@@ -8,8 +8,6 @@
  */
 export const getApiUrl = (endpoint: string = ""): string => {
   let clean = (endpoint || "").trim();
-  if (!clean) return typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000");
-
   if (!clean.startsWith("/")) {
     clean = `/${clean}`;
   }
@@ -19,12 +17,15 @@ export const getApiUrl = (endpoint: string = ""): string => {
     clean = `/api${clean}`;
   }
 
-  if (typeof window !== "undefined") {
-    return clean;
+  // If NEXT_PUBLIC_API_URL is configured (e.g. https://apni-kaksha-api.onrender.com),
+  // return absolute URL so the browser calls the backend directly without proxy timeouts
+  const base = (process.env.NEXT_PUBLIC_API_URL || "").trim();
+  if (base && base.startsWith("http")) {
+    return `${base.replace(/\/$/, "")}${clean}`;
   }
 
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-  return `${base.replace(/\/$/, "")}${clean}`;
+  // Fallback to relative path for local development / rewrites
+  return clean;
 };
 
-export const API_BASE_URL = typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000");
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
