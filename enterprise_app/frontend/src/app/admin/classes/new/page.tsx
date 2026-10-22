@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
@@ -12,8 +12,29 @@ export default function NewClassroomPage() {
   const router = useRouter();
   const [className, setClassName] = useState("");
   const [joinCode, setJoinCode] = useState("CS-" + Math.floor(100 + Math.random() * 900));
+  const [teacherId, setTeacherId] = useState("");
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, name, email")
+        .eq("role", "teacher")
+        .order("name", { ascending: true });
+      if (!error && data) {
+        setTeachers(data);
+      }
+    } catch {
+      // Fallback
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +47,7 @@ export default function NewClassroomPage() {
       const { error } = await supabase.from("classes").insert({
         class_name: className.trim(),
         join_code: joinCode.trim().toUpperCase(),
+        teacher_id: teacherId ? teacherId : null,
       });
 
       if (error) throw error;
@@ -82,6 +104,27 @@ export default function NewClassroomPage() {
             />
             <span className="text-[11px] text-[#667085] mt-1 block">
               Students will use this code on the enrollment portal to register.
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#172B4D] mb-1.5">
+              Faculty Lead (Assigned Teacher)
+            </label>
+            <select
+              value={teacherId}
+              onChange={(e) => setTeacherId(e.target.value)}
+              className="w-full bg-white border border-[#D0D5DD] rounded-xl px-3.5 py-2.5 text-xs text-[#172B4D] focus:outline-none focus:border-[#176B5B]"
+            >
+              <option value="">Unassigned (None)</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.email})
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-[#667085] mt-1 block">
+              Designate the primary instructor who conducts biometric attendance for this section.
             </span>
           </div>
 

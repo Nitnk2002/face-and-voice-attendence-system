@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Users, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
@@ -14,6 +14,31 @@ export default function StudentLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-redirect if student already has a valid active session
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const role = localStorage.getItem("user_role");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        if (payload?.exp && payload.exp * 1000 > Date.now()) {
+          if (role === "student" || payload.role === "student") {
+            router.replace("/student/dashboard");
+            return;
+          } else if (payload.role === "admin") {
+            router.replace("/admin/dashboard");
+            return;
+          } else {
+            router.replace("/dashboard");
+            return;
+          }
+        }
+      }
+    } catch {
+      // Allow user to log in if token check fails
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +66,7 @@ export default function StudentLoginPage() {
       localStorage.setItem("user_role", data.role);
       localStorage.setItem("user_email", email);
 
-      router.push("/student/dashboard");
+      router.replace("/student/dashboard");
     } catch (err: any) {
       setError(formatFetchError(err, "/api/v1/auth/login"));
     } finally {

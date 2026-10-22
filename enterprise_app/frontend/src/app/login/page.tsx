@@ -32,7 +32,25 @@ export default function LoginPage() {
 
   useEffect(() => {
     runHealthCheck();
-  }, []);
+    try {
+      const token = localStorage.getItem("access_token");
+      const role = localStorage.getItem("user_role");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        if (payload?.exp && payload.exp * 1000 > Date.now()) {
+          if (role === "admin" || payload.role === "admin") {
+            router.replace("/admin/dashboard");
+          } else if (role === "student" || payload.role === "student") {
+            router.replace("/student/dashboard");
+          } else {
+            router.replace("/dashboard");
+          }
+        }
+      }
+    } catch {
+      // Ignored
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,13 +86,13 @@ export default function LoginPage() {
         localStorage.setItem("user_email", email);
 
         if (data.role === "student") {
-          router.push("/student/dashboard");
+          router.replace("/student/dashboard");
         } else if (data.role === "admin") {
           localStorage.setItem("admin_token", data.access_token);
           localStorage.setItem("admin_role", "admin");
-          router.push("/admin/dashboard");
+          router.replace("/admin/dashboard");
         } else {
-          router.push("/dashboard");
+          router.replace("/dashboard");
         }
       } else {
         // Teacher / Faculty Sign-up

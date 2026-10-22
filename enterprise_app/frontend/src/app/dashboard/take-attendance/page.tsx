@@ -43,8 +43,11 @@ export default function TakeAttendancePage() {
   const [isVoiceScanning, setIsVoiceScanning] = useState(false);
 
   // States
-  const [scanResult, setScanResult] = useState<string | null>(null);
-  const [scanResultType, setScanResultType] = useState<"success" | "warning" | "error">("success");
+  const [faceScanResult, setFaceScanResult] = useState<string | null>(null);
+  const [faceScanResultType, setFaceScanResultType] = useState<"success" | "warning" | "error">("success");
+  const [voiceScanResult, setVoiceScanResult] = useState<string | null>(null);
+  const [voiceScanResultType, setVoiceScanResultType] = useState<"success" | "warning" | "error">("success");
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -57,6 +60,9 @@ export default function TakeAttendancePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanIntervalRef = useRef<any>(null);
   const wavRecorderRef = useRef<WavRecorder | null>(null);
+  const isScanningRef = useRef<boolean>(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 1. Fetch Class and Sessions
   useEffect(() => {
@@ -100,7 +106,8 @@ export default function TakeAttendancePage() {
     if (selected) setClassName(selected.class_name);
     setStudents([]);
     setSelectedSessionId("");
-    setScanResult(null);
+    setFaceScanResult(null);
+    setVoiceScanResult(null);
     await fetchSessions(newCid);
   };
 
@@ -225,26 +232,65 @@ export default function TakeAttendancePage() {
     };
   }, [classId, selectedSessionId]);
 
+  const handleStartFaceScanner = () => {
+    isScanningRef.current = true;
+    setIsFaceScanning(true);
+  };
+
+  const handleStopFaceScanner = () => {
+    isScanningRef.current = false;
+    setIsFaceScanning(false);
+    stopCamera();
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsMatching(false);
+  };
+
   // WebCam loop
   useEffect(() => {
     if (isFaceScanning) {
+      isScanningRef.current = true;
       startCamera();
       scanIntervalRef.current = setInterval(captureAndRecognizeFace, 2500);
     } else {
+      isScanningRef.current = false;
       stopCamera();
-      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     }
     return () => {
+      isScanningRef.current = false;
       stopCamera();
-      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
   }, [isFaceScanning, classId, selectedSessionId]);
 
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Camera blocked. Please verify browser camera permissions.");
+        setFaceScanResult("Camera blocked. Please verify browser camera permissions.");
+        setFaceScanResultType("error");
         setIsFaceScanning(false);
+        isScanningRef.current = false;
         return;
       }
 
@@ -257,16 +303,28 @@ export default function TakeAttendancePage() {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
 
+      // Guard against race condition: user stopped scanner before getUserMedia resolved
+      if (!isScanningRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      mediaStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
       }
     } catch {
       setIsFaceScanning(false);
+      isScanningRef.current = false;
     }
   };
 
   const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
@@ -276,6 +334,7 @@ export default function TakeAttendancePage() {
 
   const captureAndRecognizeFace = async () => {
     if (
+      !isScanningRef.current ||
       !videoRef.current ||
       !canvasRef.current ||
       !classId ||
@@ -296,36 +355,50 @@ export default function TakeAttendancePage() {
 
     canvas.toBlob(
       async (blob) => {
-        if (!blob) return;
+        if (!blob || !isScanningRef.current) return;
         setIsMatching(true);
         const formData = new FormData();
         formData.append("class_id", classId);
         formData.append("session_id", selectedSessionId);
         formData.append("file", blob, "webcam.jpg");
 
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
           const response = await fetch(getApiUrl("/api/v1/attendance/scan-face"), {
             method: "POST",
             body: formData,
+            signal: controller.signal,
           });
+
+          if (!isScanningRef.current) return;
 
           if (!response.ok) {
             const err = await response.json().catch(() => ({}));
-            setScanResult(`Notice: ${err.detail || "No face detected"}`);
-            setScanResultType("warning");
-            setTimeout(() => setScanResult(null), 3000);
+            setFaceScanResult(`Notice: ${err.detail || "No face detected"}`);
+            setFaceScanResultType("warning");
+            setTimeout(() => {
+              if (isScanningRef.current) setFaceScanResult(null);
+            }, 3000);
             return;
           }
 
           const data = await response.json();
+          if (!isScanningRef.current) return;
+
           if (data.spoof_detected) {
-            setScanResult(`⚠️ Presentation Alert: ${data.spoof_type || "Screen/Photo detected"}`);
-            setScanResultType("error");
-            setTimeout(() => setScanResult(null), 4000);
+            setFaceScanResult(`⚠️ Presentation Alert: ${data.spoof_type || "Screen/Photo detected"}`);
+            setFaceScanResultType("error");
+            setTimeout(() => {
+              if (isScanningRef.current) setFaceScanResult(null);
+            }, 4000);
           } else if (data.review_required) {
-            setScanResult(`⚠️ Liveness Inconclusive: Teacher Review Required`);
-            setScanResultType("warning");
-            setTimeout(() => setScanResult(null), 4000);
+            setFaceScanResult(`⚠️ Liveness Inconclusive: Teacher Review Required`);
+            setFaceScanResultType("warning");
+            setTimeout(() => {
+              if (isScanningRef.current) setFaceScanResult(null);
+            }, 4000);
           } else if (data.matched && data.student_id) {
             // Immediate Authoritative Local State Update (No refresh or delay)
             const timeStr = data.record?.marked_at
@@ -355,18 +428,27 @@ export default function TakeAttendancePage() {
               });
             });
 
-            setScanResult(`Verified: ${data.name} (Live Face ✓)`);
-            setScanResultType("success");
-            setTimeout(() => setScanResult(null), 3000);
+            setFaceScanResult(`Verified: ${data.name} (Live Face ✓)`);
+            setFaceScanResultType("success");
+            setTimeout(() => {
+              if (isScanningRef.current) setFaceScanResult(null);
+            }, 3000);
           } else {
-            setScanResult(`Not Recognized: ${data.detail || "Try framing face clearly"}`);
-            setScanResultType("warning");
-            setTimeout(() => setScanResult(null), 3000);
+            setFaceScanResult(`Not Recognized: ${data.detail || "Try framing face clearly"}`);
+            setFaceScanResultType("warning");
+            setTimeout(() => {
+              if (isScanningRef.current) setFaceScanResult(null);
+            }, 3000);
           }
-        } catch {
-          setScanResult("Network Error: Backend unreachable.");
-          setScanResultType("error");
-          setTimeout(() => setScanResult(null), 3000);
+        } catch (err: any) {
+          if (err?.name === "AbortError" || !isScanningRef.current) {
+            return;
+          }
+          setFaceScanResult("Network Error: Backend unreachable.");
+          setFaceScanResultType("error");
+          setTimeout(() => {
+            if (isScanningRef.current) setFaceScanResult(null);
+          }, 3000);
         } finally {
           setIsMatching(false);
         }
@@ -416,9 +498,9 @@ export default function TakeAttendancePage() {
       });
       const data = await response.json();
       if (data.spoof_detected) {
-        setScanResult(`⚠️ Voice Alert: ${data.spoof_type || "Recorded speaker detected"}`);
-        setScanResultType("error");
-        setTimeout(() => setScanResult(null), 4000);
+        setVoiceScanResult(`⚠️ Voice Alert: ${data.spoof_type || "Recorded speaker detected"}`);
+        setVoiceScanResultType("error");
+        setTimeout(() => setVoiceScanResult(null), 4000);
       } else if (data.matched && data.student_id) {
         // Immediate Authoritative Local State Update
         const timeStr = data.record?.marked_at
@@ -448,18 +530,18 @@ export default function TakeAttendancePage() {
           });
         });
 
-        setScanResult(`Verified Voice: ${data.name} (Live ✓)`);
-        setScanResultType("success");
-        setTimeout(() => setScanResult(null), 3000);
+        setVoiceScanResult(`Verified Voice: ${data.name} (Live ✓)`);
+        setVoiceScanResultType("success");
+        setTimeout(() => setVoiceScanResult(null), 3000);
       } else {
-        setScanResult(`Voice Mismatch: ${data.detail || "Could not recognize voice"}`);
-        setScanResultType("warning");
-        setTimeout(() => setScanResult(null), 3000);
+        setVoiceScanResult(`Voice Mismatch: ${data.detail || "Could not recognize voice"}`);
+        setVoiceScanResultType("warning");
+        setTimeout(() => setVoiceScanResult(null), 3000);
       }
     } catch {
-      setScanResult("Network Error: Backend unreachable.");
-      setScanResultType("error");
-      setTimeout(() => setScanResult(null), 3000);
+      setVoiceScanResult("Network Error: Backend unreachable.");
+      setVoiceScanResultType("error");
+      setTimeout(() => setVoiceScanResult(null), 3000);
     } finally {
       setIsMatching(false);
       setAudioBlob(null);
@@ -493,9 +575,8 @@ export default function TakeAttendancePage() {
         hour: "2-digit",
         minute: "2-digit",
       });
-      setScanResult(`Session Launched (${timeStr}) ✓`);
-      setScanResultType("success");
-      setTimeout(() => setScanResult(null), 4000);
+      setSessionNotice(`Session Launched (${timeStr}) ✓`);
+      setTimeout(() => setSessionNotice(null), 4000);
     } catch (e: any) {
       alert("Failed to start new session: " + (e?.message || "Check network"));
     }
@@ -548,11 +629,10 @@ export default function TakeAttendancePage() {
         });
       });
 
-      setScanResult(`Manually marked ${manualStudent.name} present ✓`);
-      setScanResultType("success");
+      setSessionNotice(`Manually marked ${manualStudent.name} present ✓`);
       setIsManualConfirmOpen(false);
       setManualStudent(null);
-      setTimeout(() => setScanResult(null), 3000);
+      setTimeout(() => setSessionNotice(null), 3000);
     } catch {
       alert("Could not update attendance record.");
     }
@@ -610,26 +690,6 @@ export default function TakeAttendancePage() {
           </div>
         }
       />
-
-      {/* Real-Time Notification Banner */}
-      {scanResult && (
-        <div
-          className={`mb-6 p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all shadow-xs ${
-            scanResultType === "success"
-              ? "bg-[#F4FBF7] border-[#CEEAD6] text-[#16845B]"
-              : scanResultType === "warning"
-              ? "bg-[#FEFBF0] border-[#FEEFC3] text-[#B7791F]"
-              : "bg-[#FDF4F4] border-[#FAD2CF] text-[#C2413B]"
-          }`}
-        >
-          {scanResultType === "success" ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-          )}
-          <span>{scanResult}</span>
-        </div>
-      )}
 
       {/* Main 2-Column Scanner Interface */}
       <div className="grid lg:grid-cols-12 gap-8 items-start">
@@ -691,12 +751,32 @@ export default function TakeAttendancePage() {
               )}
             </div>
 
+            {/* Live Face Scan Feedback Notification (Positioned directly above Stop button) */}
+            {faceScanResult && (
+              <div
+                className={`mb-4 p-3 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all shadow-xs ${
+                  faceScanResultType === "success"
+                    ? "bg-[#F4FBF7] border-[#CEEAD6] text-[#16845B]"
+                    : faceScanResultType === "warning"
+                    ? "bg-[#FEFBF0] border-[#FEEFC3] text-[#B7791F]"
+                    : "bg-[#FDF4F4] border-[#FAD2CF] text-[#C2413B]"
+                }`}
+              >
+                {faceScanResultType === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{faceScanResult}</span>
+              </div>
+            )}
+
             {/* Camera Controls */}
             <div className="flex gap-3">
               {isFaceScanning ? (
                 <button
                   type="button"
-                  onClick={() => setIsFaceScanning(false)}
+                  onClick={handleStopFaceScanner}
                   className="flex-1 py-2.5 rounded-xl bg-[#C2413B] hover:bg-[#9B2C27] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors"
                 >
                   <Square className="w-3.5 h-3.5" />
@@ -705,7 +785,7 @@ export default function TakeAttendancePage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIsFaceScanning(true)}
+                  onClick={handleStartFaceScanner}
                   className="flex-1 py-2.5 rounded-xl bg-[#176B5B] hover:bg-[#12584A] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors"
                 >
                   <Play className="w-3.5 h-3.5" />
@@ -786,11 +866,38 @@ export default function TakeAttendancePage() {
                 </button>
               )}
             </div>
+
+            {/* Live Voice Scan Feedback Notification (Positioned inside Voice card) */}
+            {voiceScanResult && (
+              <div
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all shadow-xs ${
+                  voiceScanResultType === "success"
+                    ? "bg-[#F4FBF7] border-[#CEEAD6] text-[#16845B]"
+                    : voiceScanResultType === "warning"
+                    ? "bg-[#FEFBF0] border-[#FEEFC3] text-[#B7791F]"
+                    : "bg-[#FDF4F4] border-[#FAD2CF] text-[#C2413B]"
+                }`}
+              >
+                {voiceScanResultType === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{voiceScanResult}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Live Roster & Manual Overrides (5 cols) */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-[#E5E9E6] p-6 shadow-2xs">
+          {sessionNotice && (
+            <div className="mb-4 p-3 rounded-xl border border-[#CEEAD6] bg-[#F4FBF7] text-[#16845B] text-xs font-semibold flex items-center gap-2.5 transition-all shadow-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{sessionNotice}</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-base font-bold text-[#172B4D]">Live Session Roster</h3>

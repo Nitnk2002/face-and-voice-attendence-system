@@ -63,8 +63,40 @@ export const checkBackendHealth = async (): Promise<BackendHealthStatus> => {
 };
 
 /**
- * Formats low-level browser network errors into clear, actionable diagnosis for users.
+ * Refreshes active session JWT with backend to support multi-browser independent sessions
+ * and prevent unexpected expirations during continuous work.
  */
+export const refreshSessionToken = async (): Promise<string | null> => {
+  if (typeof window === "undefined") return null;
+
+  const token = localStorage.getItem("access_token") || localStorage.getItem("admin_token");
+  if (!token) return null;
+
+  try {
+    const res = await fetch(getApiUrl("/api/v1/auth/refresh"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ token })
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data.access_token) {
+      localStorage.setItem("access_token", data.access_token);
+      if (data.role === "admin") {
+        localStorage.setItem("admin_token", data.access_token);
+      }
+      return data.access_token;
+    }
+  } catch {
+    // Network failure during refresh; do not immediately clear session if temporarily offline
+  }
+  return null;
+};
 export const formatFetchError = (err: any, endpoint: string = ""): string => {
   const target = getApiUrl(endpoint);
   const msg = err?.message || "";

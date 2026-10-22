@@ -1,8 +1,10 @@
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+from jose import jwt
 from core.config import settings
 from core.security import (
     create_access_token,
@@ -69,6 +71,83 @@ def login_access_token(
     
     return {
         "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role
+    }
+
+class TokenRefreshRequest(BaseModel):
+    token: Optional[str] = None
+
+@router.post("/refresh")
+def refresh_access_token(
+    body: Optional[TokenRefreshRequest] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Refreshes an active JWT access token to support continuous, multi-browser faculty sessions.
+    Validates token signature, allows renewal for unexpired or gracefully expiring sessions,
+    and returns a newly signed 30-minute token without logging out other devices.
+    """
+    token_to_verify = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token_to_verify = authorization.split(" ", 1)[1].strip()
+    elif body and body.token:
+        token_to_verify = body.token.strip()
+
+    if not token_to_verify:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization token required for refresh"
+        )
+
+    try:
+        # Decode without verifying expiration first to evaluate renewal eligibility
+        payload = jwt.decode(
+            token_to_verify,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": False}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or malformed authentication token"
+        )
+
+    exp = payload.get("exp")
+    user_id = payload.get("sub")
+    if not exp or not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing required claims"
+        )
+
+    # Strictly disallow revival of ancient expired tokens (max grace window of 15 minutes)
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if now_ts > (exp + 15 * 60):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has expired. Please log in again."
+        )
+
+    # Verify that the user still exists in the database
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account not found or deactivated"
+        )
+
+    new_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_token = create_access_token(
+        subject=user.id,
+        expires_delta=new_expires,
+        role=user.role
+    )
+
+    return {
+        "access_token": new_token,
         "token_type": "bearer",
         "role": user.role
     }

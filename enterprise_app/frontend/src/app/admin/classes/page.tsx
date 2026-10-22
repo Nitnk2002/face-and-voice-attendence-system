@@ -26,7 +26,16 @@ export default function AdminClassesPage() {
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const { data: cls } = await supabase.from("classes").select("id, class_name, join_code, created_at");
+      const { data: cls } = await supabase
+        .from("classes")
+        .select(`
+          id,
+          class_name,
+          join_code,
+          created_at,
+          teacher_id,
+          users:teacher_id ( id, name, email, custom_id )
+        `);
       const list = cls || [];
 
       // Fetch student count for each class
@@ -37,8 +46,11 @@ export default function AdminClassesPage() {
             .select("*", { count: "exact", head: true })
             .eq("class_id", c.id);
 
+          const teacher = Array.isArray(c.users) ? c.users[0] : c.users;
+
           return {
             ...c,
+            teacher,
             studentCount: count || 0,
           };
         })
@@ -70,7 +82,9 @@ export default function AdminClassesPage() {
   const filtered = classes.filter(
     (c) =>
       c.class_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.join_code.toLowerCase().includes(search.toLowerCase())
+      c.join_code.toLowerCase().includes(search.toLowerCase()) ||
+      (c.teacher?.name && c.teacher.name.toLowerCase().includes(search.toLowerCase())) ||
+      (c.teacher?.email && c.teacher.email.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -118,6 +132,7 @@ export default function AdminClassesPage() {
                 <tr>
                   <th className="px-4 py-3">Classroom Title</th>
                   <th className="px-4 py-3">Join Code</th>
+                  <th className="px-4 py-3">Faculty Lead</th>
                   <th className="px-4 py-3">Enrolled Students</th>
                   <th className="px-4 py-3">Created Date</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -131,6 +146,22 @@ export default function AdminClassesPage() {
                     </td>
                     <td className="px-4 py-3.5 font-mono text-[#176B5B] font-bold">
                       {cls.join_code}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {cls.teacher ? (
+                        <div>
+                          <div className="font-semibold text-[#172B4D]">
+                            {cls.teacher.name}
+                          </div>
+                          <div className="text-[11px] text-[#667085] font-mono">
+                            {cls.teacher.email}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#F1F3F4] text-[#5F6368] border border-[#DADCE0]">
+                          Unassigned
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-[#667085]">
                       <span className="inline-flex items-center gap-1.5 font-medium">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ShieldAlert, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
@@ -23,6 +23,20 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem("admin_token");
+      if (token) {
+        const payload = decodeJwtPayload(token);
+        if (payload?.exp && payload.exp * 1000 > Date.now() && payload.role === "admin") {
+          router.replace("/admin/dashboard");
+        }
+      }
+    } catch {
+      // Ignored
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +69,7 @@ export default function AdminLoginPage() {
       localStorage.setItem("admin_token", data.access_token);
       localStorage.setItem("admin_role", payload.role);
       localStorage.setItem("user_name", "System Administrator");
-      router.push("/admin/dashboard");
+      router.replace("/admin/dashboard");
     } catch (err: any) {
       setError(formatFetchError(err, "/api/v1/auth/login"));
     } finally {

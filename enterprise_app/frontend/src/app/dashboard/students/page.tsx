@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users, Trash2, Search, ArrowRight, ShieldCheck } from "lucide-react";
+import { Users, Trash2, Search, ArrowRight, ShieldCheck, Camera, Mic, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -57,6 +57,7 @@ export default function ReviewStudentsPage() {
           id,
           class_id,
           student_id,
+          enrolled_at,
           users ( id, name, email, custom_id )
         `)
         .eq("class_id", cid)
@@ -64,13 +65,46 @@ export default function ReviewStudentsPage() {
 
       if (error) throw error;
 
-      const formatted = (data || []).map((e: any) => ({
-        id: e.id,
-        studentId: e.student_id,
-        name: e.users?.name || "Student",
-        email: e.users?.email || "—",
-        roll: e.users?.custom_id || "N/A",
-      }));
+      const studentIds = (data || []).map((e: any) => e.student_id).filter(Boolean);
+      const biometricsMap: Record<string, { hasFace: boolean; hasVoice: boolean }> = {};
+
+      if (studentIds.length > 0) {
+        // Query active biometric status without retrieving raw embedding vectors (privacy & performance)
+        const { data: biometrics } = await supabase
+          .from("student_biometrics")
+          .select("student_id, biometric_type, is_active")
+          .in("student_id", studentIds)
+          .eq("is_active", true);
+
+        (biometrics || []).forEach((b: any) => {
+          if (!biometricsMap[b.student_id]) {
+            biometricsMap[b.student_id] = { hasFace: false, hasVoice: false };
+          }
+          if (b.biometric_type === "face") {
+            biometricsMap[b.student_id].hasFace = true;
+          } else if (b.biometric_type === "voice") {
+            biometricsMap[b.student_id].hasVoice = true;
+          }
+        });
+      }
+
+      const formatted = (data || []).map((e: any) => {
+        const bio = biometricsMap[e.student_id] || { hasFace: false, hasVoice: false };
+        let biometricStatus: "both" | "face_only" | "voice_only" | "none" = "none";
+        if (bio.hasFace && bio.hasVoice) biometricStatus = "both";
+        else if (bio.hasFace) biometricStatus = "face_only";
+        else if (bio.hasVoice) biometricStatus = "voice_only";
+
+        return {
+          id: e.id,
+          studentId: e.student_id,
+          name: e.users?.name || "Student",
+          email: e.users?.email || "—",
+          roll: e.users?.custom_id || "N/A",
+          enrolledAt: e.enrolled_at,
+          biometricStatus,
+        };
+      });
 
       setEnrollments(formatted);
     } catch {
@@ -175,6 +209,7 @@ export default function ReviewStudentsPage() {
                   <th className="px-4 py-3">Student Name</th>
                   <th className="px-4 py-3">Roll ID</th>
                   <th className="px-4 py-3">Email Address</th>
+                  <th className="px-4 py-3">Enrolled On</th>
                   <th className="px-4 py-3">Biometrics Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -190,11 +225,40 @@ export default function ReviewStudentsPage() {
                     </td>
                     <td className="px-4 py-3.5 font-mono text-[#667085]">{item.roll}</td>
                     <td className="px-4 py-3.5 font-mono text-[#667085]">{item.email}</td>
+                    <td className="px-4 py-3.5 font-mono text-[#667085]">
+                      {item.enrolledAt
+                        ? new Date(item.enrolledAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </td>
                     <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]">
-                        <ShieldCheck className="w-3.5 h-3.5 text-[#137333]" />
-                        <span>Face & Voice Enrolled</span>
-                      </span>
+                      {item.biometricStatus === "both" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#137333]" />
+                          <span>Face & Voice Enrolled</span>
+                        </span>
+                      )}
+                      {item.biometricStatus === "face_only" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#E8F0FE] text-[#1967D2] border border-[#D2E3FC]">
+                          <Camera className="w-3.5 h-3.5 text-[#1967D2]" />
+                          <span>Face Only (Voice Missing)</span>
+                        </span>
+                      )}
+                      {item.biometricStatus === "voice_only" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#FEF7E0] text-[#B06000] border border-[#FEEFC3]">
+                          <Mic className="w-3.5 h-3.5 text-[#B06000]" />
+                          <span>Voice Only (Face Missing)</span>
+                        </span>
+                      )}
+                      {item.biometricStatus === "none" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#F1F3F4] text-[#5F6368] border border-[#DADCE0]">
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#5F6368]" />
+                          <span>Pending Enrollment</span>
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button

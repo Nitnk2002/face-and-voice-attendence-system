@@ -98,6 +98,7 @@ export function Sidebar({
       {/* Sidebar Header */}
       <div className="h-16 px-6 border-b border-[#E5E9E6] flex items-center justify-between">
         <AppLogo
+          href={role === "admin" ? "/admin/dashboard" : role === "student" ? "/student/dashboard" : "/dashboard"}
           subtitle={role === "admin" ? "Admin Portal" : role === "student" ? "Student Hub" : "Faculty Suite"}
           size="sm"
         />

@@ -17,6 +17,8 @@ export default function EditClassroomPage({ params }: PageProps) {
   const router = useRouter();
   const [className, setClassName] = useState("");
   const [joinCode, setJoinCode] = useState("");
+  const [teacherId, setTeacherId] = useState("");
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -29,15 +31,27 @@ export default function EditClassroomPage({ params }: PageProps) {
   const fetchClassData = async () => {
     setFetching(true);
     try {
-      const { data, error } = await supabase
-        .from("classes")
-        .select("id, class_name, join_code")
-        .eq("id", id)
-        .single();
+      const [classRes, teachersRes] = await Promise.all([
+        supabase
+          .from("classes")
+          .select("id, class_name, join_code, teacher_id")
+          .eq("id", id)
+          .single(),
+        supabase
+          .from("users")
+          .select("id, name, email")
+          .eq("role", "teacher")
+          .order("name", { ascending: true }),
+      ]);
 
-      if (error || !data) throw error;
-      setClassName(data.class_name);
-      setJoinCode(data.join_code);
+      if (classRes.error || !classRes.data) throw classRes.error;
+      setClassName(classRes.data.class_name);
+      setJoinCode(classRes.data.join_code);
+      setTeacherId(classRes.data.teacher_id || "");
+
+      if (!teachersRes.error && teachersRes.data) {
+        setTeachers(teachersRes.data);
+      }
     } catch {
       setErrorMsg("Failed to load classroom details.");
     } finally {
@@ -57,6 +71,7 @@ export default function EditClassroomPage({ params }: PageProps) {
         .update({
           class_name: className.trim(),
           join_code: joinCode.trim().toUpperCase(),
+          teacher_id: teacherId ? teacherId : null,
         })
         .eq("id", id);
 
@@ -125,6 +140,27 @@ export default function EditClassroomPage({ params }: PageProps) {
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 className="w-full bg-white border border-[#D0D5DD] rounded-xl px-3.5 py-2.5 text-xs text-[#172B4D] font-mono uppercase tracking-wider focus:outline-none focus:border-[#176B5B]"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#172B4D] mb-1.5">
+                Faculty Lead (Assigned Teacher)
+              </label>
+              <select
+                value={teacherId}
+                onChange={(e) => setTeacherId(e.target.value)}
+                className="w-full bg-white border border-[#D0D5DD] rounded-xl px-3.5 py-2.5 text-xs text-[#172B4D] focus:outline-none focus:border-[#176B5B]"
+              >
+                <option value="">Unassigned (None)</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.email})
+                  </option>
+                ))}
+              </select>
+              <span className="text-[11px] text-[#667085] mt-1 block">
+                Designate the primary instructor who conducts biometric attendance for this section.
+              </span>
             </div>
 
             <div className="flex gap-3 pt-3">
